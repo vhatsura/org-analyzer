@@ -3,23 +3,23 @@
 using System.Text;
 using System.Text.Json;
 using Octokit;
-using Octokit.Internal;
+using Octokit.Helpers;
 
 namespace OrgAnalyzer;
 
 static class Program
 {
-    private const string Token = "";
-    private const string Organization = "oveo-io";
+    internal const string Organization = "";
 
     static async Task Main()
     {
-        await AnalyzeActionsSecretUsage();
+        // await ChangeActionSecret();
+        await OpenPullRequestAnalyzer.AnalyzeOpenPullRequests();
     }
 
-    static async Task AnalyzeActionsSecretUsage()
+    static async Task ChangeActionSecret()
     {
-        var client = CreateClient();
+        var client = GitHubApiClient.Create();
 
         var repositories = await client.Repository.GetAllForOrg(Organization, new ApiOptions { PageSize = 100 });
 
@@ -28,10 +28,11 @@ static class Program
         var result = new Dictionary<long, HashSet<RepositoryContent>>();
         var repositoriesDictionary = new Dictionary<long, Repository>();
 
+        var repoIdsWithCreatedPRs = new HashSet<long>();
+
         foreach (var repository in repositories)
         {
             repositoriesDictionary.Add(repository.Id, repository);
-
 
             try
             {
@@ -45,7 +46,7 @@ static class Program
 
                         var rawContent = Encoding.UTF8.GetString(rawContentByteArray);
 
-                        if (rawContent.Contains("DEV_KAFKA_BROKERS"))
+                        if (rawContent.Contains("secrets.DEV_KAFKA_BROKERS"))
                         {
                             if (!result.ContainsKey(repository.Id))
                             {
@@ -53,6 +54,36 @@ static class Program
                             }
 
                             result[repository.Id].Add(content);
+
+                            try
+                            {
+                                if (!repoIdsWithCreatedPRs.Contains(repository.Id))
+                                {
+                                    var mainReference = await client.Git.Reference.Get(repository.Id, "heads/main");
+
+                                    await client.Git.Reference.CreateBranch(Organization, repository.Name,
+                                        "staging/kafka/update", mainReference);
+                                }
+
+                                var replacedContent = rawContent.Replace("secrets.DEV_KAFKA_BROKERS",
+                                    "secrets.STAGING_KAFKA_BROKERS");
+
+                                await client.Repository.Content.UpdateFile(Organization, repository.Name, content.Path,
+                                    new UpdateFileRequest("[auto] update kafka secret name for Staging",
+                                        replacedContent, content.Sha) { Branch = "staging/kafka/update" });
+
+                                if (!repoIdsWithCreatedPRs.Contains(repository.Id))
+                                {
+                                    await client.Repository.PullRequest.Create(repository.Id,
+                                        new NewPullRequest("Update kafka secret name for Staging",
+                                            "staging/kafka/update",
+                                            "main") { Body = "Automatically created pull request" });
+                                    repoIdsWithCreatedPRs.Add(repository.Id);
+                                }
+                            }
+                            catch (ApiException ex)
+                            {
+                            }
                         }
                     }
                 }
@@ -68,72 +99,9 @@ static class Program
             RepositoryUrl = repositoriesDictionary[x.Key].Url,
             Files = x.Value.Select(c => c.Path).ToList()
         }).ToList();
-
-        await using var memoryStream = new MemoryStream();
-
-        var stringData = JsonSerializer.Serialize(filesContainsSecret, new JsonSerializerOptions { WriteIndented = true });
-    }
-
-    static async Task AnalyzeOpenPullRequests()
-    {
-        var repositoriesMetadata = await LoadFromGitHubApiAndSaveToDataFile();
-
-        if (repositoriesMetadata == null) throw new InvalidOperationException();
-
-        var repositoriesWithHighestAmountOfOpenPullRequests =
-            repositoriesMetadata.OrderByDescending(x => x.PullRequests.Count).Take(5).ToList();
-    }
-
-    // fix deserialization. Most of properties are null
-    static async Task<IList<RepositoryMetadata>?> LoadFromDataFile()
-    {
-        return await JsonSerializer.DeserializeAsync<List<RepositoryMetadata>>(File.OpenRead("./data.json"),
-            new JsonSerializerOptions { Converters = { new StringEnumJsonConverter<PermissionLevel>() } });
-    }
-
-    static async Task<IList<RepositoryMetadata>> LoadFromGitHubApiAndSaveToDataFile()
-    {
-        Console.WriteLine($"{DateTime.UtcNow:u} - Load from GitHub API has started");
-
-        var repositoriesMetadata = await LoadFromGitHubApi();
-
-        Console.WriteLine($"{DateTime.UtcNow:u} - Load from GitHub API ended");
-
-        await File.WriteAllTextAsync("./data.json",
-            JsonSerializer.Serialize(repositoriesMetadata,
-                new JsonSerializerOptions { Converters = { new StringEnumJsonConverter<PermissionLevel>() } }));
-
-        return repositoriesMetadata;
-    }
-
-    static async Task<IList<RepositoryMetadata>> LoadFromGitHubApi()
-    {
-        var github = CreateClient();
-
-        var repositories = await github.Repository.GetAllForOrg(Organization, new ApiOptions { PageSize = 100 });
-
-        if (repositories.Count == 100) throw new InvalidOperationException();
-
-        var repositoriesMetadata = new List<RepositoryMetadata>();
-
-        foreach (var repository in repositories)
-        {
-            var openPullRequests = await github.PullRequest.GetAllForRepository(repository.Id,
-                new PullRequestRequest { State = ItemStateFilter.Open },
-                new ApiOptions { PageSize = 100 });
-
-            if (openPullRequests.Count == 100) throw new InvalidOperationException();
-
-            repositoriesMetadata.Add(new RepositoryMetadata(repository, openPullRequests));
-        }
-
-        return repositoriesMetadata;
-    }
-
-    static GitHubClient CreateClient()
-    {
-        var credentials = new Credentials(Token);
-        return new GitHubClient(new ProductHeaderValue("MyApp"), new InMemoryCredentialStore(credentials));
+        
+        var stringData =
+            JsonSerializer.Serialize(filesContainsSecret, new JsonSerializerOptions { WriteIndented = true });
     }
 }
 
