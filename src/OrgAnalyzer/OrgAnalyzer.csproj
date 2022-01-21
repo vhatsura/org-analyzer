@@ -9,6 +9,7 @@
 
     <ItemGroup>
       <PackageReference Include="Octokit" Version="0.50.0" />
+      <PackageReference Include="Octokit.GraphQL" Version="0.1.8-beta" />
       <PackageReference Include="System.Text.Json" Version="6.0.1" />
     </ItemGroup>
 

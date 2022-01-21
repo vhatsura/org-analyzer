@@ -87,7 +87,7 @@ public static class OpenPullRequestAnalyzer
 
     static async Task<IList<RepositoryMetadata>> LoadFromGitHubApi()
     {
-        var github = GitHubApiClient.Create();
+        var github = GitHubApiClient.CreateRestClient();
 
         var repositories =
             await github.Repository.GetAllForOrg(Program.Organization, new ApiOptions { PageSize = 100 });

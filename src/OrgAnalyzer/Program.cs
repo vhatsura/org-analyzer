@@ -1,4 +1,4 @@
-﻿// See https://aka.ms/new-console-template for more information
+// See https://aka.ms/new-console-template for more information
 
 using System.Text;
 using System.Text.Json;
@@ -14,12 +14,15 @@ static class Program
     static async Task Main()
     {
         // await ChangeActionSecret();
-        await OpenPullRequestAnalyzer.AnalyzeOpenPullRequests();
+        //await OpenPullRequestAnalyzer.AnalyzeOpenPullRequests();
+        //await BranchProtectionAnalyzer.AnalyzeBranchProtectionRules();
+        //await CodeOwnershipAnalyzer.AnalyzeCodeOwnership();
+        await ActionSecretUsageAnalyzer.AnalyzeActionSecretUsage("PROD_KAFKA_BROKERS");
     }
 
     static async Task ChangeActionSecret()
     {
-        var client = GitHubApiClient.Create();
+        var client = GitHubApiClient.CreateRestClient();
 
         var repositories = await client.Repository.GetAllForOrg(Organization, new ApiOptions { PageSize = 100 });
 
