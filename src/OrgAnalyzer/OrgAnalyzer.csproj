@@ -8,9 +8,19 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Octokit" Version="0.50.0" />
+      <PackageReference Include="CodeOwnersParser" Version="0.2.0" />
+      <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
+      <PackageReference Include="Microsoft.Extensions.Options" Version="6.0.0" />
+      <PackageReference Include="Octokit" Version="1.0.0" />
       <PackageReference Include="Octokit.GraphQL" Version="0.1.8-beta" />
-      <PackageReference Include="System.Text.Json" Version="6.0.1" />
+      <PackageReference Include="System.Text.Json" Version="6.0.5" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Remove="appsettings.json" />
+      <Content Include="appsettings.json">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
     </ItemGroup>
 
 </Project>

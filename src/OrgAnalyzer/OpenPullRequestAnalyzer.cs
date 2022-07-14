@@ -3,9 +3,16 @@ using Octokit;
 
 namespace OrgAnalyzer;
 
-public static class OpenPullRequestAnalyzer
+public class OpenPullRequestAnalyzer
 {
-    internal static async Task AnalyzeOpenPullRequests()
+    private readonly GitHubService _gitHubService;
+
+    public OpenPullRequestAnalyzer(GitHubService gitHubService)
+    {
+        _gitHubService = gitHubService;
+    }
+
+    internal async Task AnalyzeOpenPullRequests()
     {
         var repositoriesMetadata = await LoadFromGitHubApiAndSaveToDataFile();
 
@@ -26,9 +33,9 @@ public static class OpenPullRequestAnalyzer
                 })
             .OrderByDescending(x => x.PullRequests.Count)
             .ToList();
-        
+
         var pullRequestsByReviewer = repositoriesMetadata.SelectMany(x => x.PullRequests)
-            .SelectMany(x => x.RequestedReviewers.Select(r => new {Reviewer = r, x.HtmlUrl}))
+            .SelectMany(x => x.RequestedReviewers.Select(r => new { Reviewer = r, x.HtmlUrl }))
             .GroupBy(x => x.Reviewer.Login)
             .Select(x =>
                 new
@@ -70,7 +77,7 @@ public static class OpenPullRequestAnalyzer
             new JsonSerializerOptions { Converters = { new StringEnumJsonConverter<PermissionLevel>() } });
     }
 
-    static async Task<IList<RepositoryMetadata>> LoadFromGitHubApiAndSaveToDataFile()
+    async Task<IList<RepositoryMetadata>> LoadFromGitHubApiAndSaveToDataFile()
     {
         Console.WriteLine($"{DateTime.UtcNow:u} - Load from GitHub API has started");
 
@@ -85,26 +92,19 @@ public static class OpenPullRequestAnalyzer
         return repositoriesMetadata;
     }
 
-    static async Task<IList<RepositoryMetadata>> LoadFromGitHubApi()
+    async Task<IList<RepositoryMetadata>> LoadFromGitHubApi()
     {
-        var github = GitHubApiClient.CreateRestClient();
-
-        var repositories =
-            await github.Repository.GetAllForOrg(Program.Organization, new ApiOptions { PageSize = 100 });
-
-        if (repositories.Count == 100) throw new InvalidOperationException();
-
         var repositoriesMetadata = new List<RepositoryMetadata>();
 
-        foreach (var repository in repositories)
+        await foreach (var repositories in _gitHubService.OrganizationRepositories())
         {
-            var openPullRequests = await github.PullRequest.GetAllForRepository(repository.Id,
-                new PullRequestRequest { State = ItemStateFilter.Open },
-                new ApiOptions { PageSize = 100 });
-
-            if (openPullRequests.Count == 100) throw new InvalidOperationException();
-
-            repositoriesMetadata.Add(new RepositoryMetadata(repository, openPullRequests));
+            foreach (var repository in repositories)
+            {
+                await foreach (var openPullRequests in _gitHubService.OpenRepositoryPullRequests(repository.Id))
+                {
+                    repositoriesMetadata.Add(new RepositoryMetadata(repository, openPullRequests));
+                }
+            }
         }
 
         return repositoriesMetadata;

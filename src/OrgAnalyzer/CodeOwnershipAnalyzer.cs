@@ -1,45 +1,42 @@
-﻿using Octokit;
-using Octokit.GraphQL;
-using Octokit.GraphQL.Core;
+﻿using CodeOwners;
+using Octokit;
 
 namespace OrgAnalyzer;
 
-public static class CodeOwnershipAnalyzer
+public record CodeOwnershipResult(HashSet<string> RepositoriesWithMissedOwnershipTopic);
+
+public class CodeOwnershipAnalyzer
 {
-    internal static async Task AnalyzeCodeOwnership()
+    private readonly GitHubService _gitHubService;
+
+    public CodeOwnershipAnalyzer(GitHubService gitHubService)
     {
-        var client = GitHubApiClient.CreateRestClient();
-        var gqlConnection = GitHubApiClient.CreateGraphQlConnection();
-        var repositories =
-            await client.Repository.GetAllForOrg(Program.Organization, new ApiOptions { PageSize = 100 });
+        _gitHubService = gitHubService;
+    }
 
-        if (repositories.Count == 100) throw new InvalidOperationException();
-
+    internal async Task<CodeOwnershipResult> AnalyzeCodeOwnership()
+    {
         var missedOwnershipTopics = new List<Repository>();
-        foreach (var repository in repositories)
+
+        await foreach (var repositories in _gitHubService.OrganizationRepositories())
         {
-            var query = new Query()
-                .Repository(new Arg<string>(repository.Name), new Arg<string>(repository.Owner.Login))
-                .RepositoryTopics(50)
-                .Select(repoTopics => new
-                {
-                    repoTopics.PageInfo.HasNextPage,
-                    Topics = repoTopics.Edges.Select(e => e.Node.Topic.Name).ToList()
-                })
-                .Compile();
-
-            var result = await gqlConnection.Run(query);
-
-            if (result.HasNextPage) throw new InvalidOperationException();
-
-            var ownershipTopic = result.Topics.FirstOrDefault(x => x.StartsWith("ownership-"));
-            if (ownershipTopic == null)
+            foreach (var repository in repositories.Where(x => !x.Archived))
             {
-                missedOwnershipTopics.Add(repository);
-                continue;
-            }
+                var repositoryTopics = await _gitHubService.RepositoryTopics(repository);
 
-            var ownershipArea = ownershipTopic.Substring(10);
+                var ownershipTopic = repositoryTopics.FirstOrDefault(x => x.StartsWith("ownership-"));
+                if (ownershipTopic == null)
+                {
+                    missedOwnershipTopics.Add(repository);
+                    continue;
+                }
+
+                var ownershipArea = ownershipTopic.Substring(10);
+
+                CodeOwnersParser.Parse("");
+            }
         }
+
+        return new CodeOwnershipResult(missedOwnershipTopics.Select(x => x.FullName).ToHashSet());
     }
 }

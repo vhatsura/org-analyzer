@@ -1,61 +1,58 @@
 ﻿using Octokit;
-using Octokit.GraphQL;
-using Octokit.GraphQL.Core;
-using Octokit.GraphQL.Model;
 using Repository = Octokit.Repository;
 
 namespace OrgAnalyzer;
 
-public static class BranchProtectionAnalyzer
+public record BranchProtectionAnalyzerResult(
+    HashSet<(Repository Repository, BranchProtectionSettings? BranchProtection)> MissedBranchProtectionRules) :
+    IAnalyzerResult;
+
+public class BranchProtectionAnalyzer : IAnalyzer<BranchProtectionAnalyzerResult>
 {
-    internal static async Task AnalyzeBranchProtectionRules()
+    private readonly GitHubService _gitHubService;
+
+    public BranchProtectionAnalyzer(GitHubService gitHubService)
     {
-        var client = GitHubApiClient.CreateRestClient();
-        var gqlConnection = GitHubApiClient.CreateGraphQlConnection();
-
-        var repositories =
-            await client.Repository.GetAllForOrg(Program.Organization, new ApiOptions { PageSize = 100 });
-
-        if (repositories.Count == 100) throw new InvalidOperationException();
-
-        foreach (var repository in repositories)
-        {
-            try
-            {
-                var branchProtection =
-                    await client.Repository.Branch.GetBranchProtection(repository.Id, repository.DefaultBranch);
-            }
-            catch (NotFoundException ex)
-            {
-                await CreateBranchProtectionRule(gqlConnection, repository);
-            }
-        }
+        _gitHubService = gitHubService;
     }
 
-    private static async Task CreateBranchProtectionRule(Octokit.GraphQL.Connection gqlConnection,
-        Repository repository)
+    public async Task<BranchProtectionAnalyzerResult> RunAnalysis()
     {
-        var mutation = new Mutation()
-            .CreateBranchProtectionRule(new Arg<CreateBranchProtectionRuleInput>(new CreateBranchProtectionRuleInput
+        var branchProtectionRules = new HashSet<(Repository Repository, BranchProtectionSettings? BranchProtection)>();
+
+        await foreach (var repositories in _gitHubService.OrganizationRepositories())
+        {
+            foreach (var repository in repositories)
             {
-                Pattern = repository.DefaultBranch,
-                RepositoryId = new ID(repository.NodeId),
-                AllowsDeletions = false,
-                AllowsForcePushes = false,
-                RequiresCodeOwnerReviews = true,
-                RequiresApprovingReviews = true,
-                RequiresLinearHistory = true,
-                RequiresStatusChecks = true,
-                RequiredApprovingReviewCount = 2,
-                RequiresStrictStatusChecks = true,
-                RequiresConversationResolution = true,
-                DismissesStaleReviews = true
-            }))
-            .Select(payload => new
-            {
-                payload.ClientMutationId
-            });
-        
-        var result = await gqlConnection.Run(mutation);
+                try
+                {
+                    var branchProtection =
+                        await _gitHubService.BranchProtection(repository.Id, repository.DefaultBranch);
+
+                    branchProtectionRules.Add((repository, branchProtection));
+                }
+                catch (NotFoundException ex)
+                {
+                    branchProtectionRules.Add((repository, null));
+                    // await _gitHubService.CreateBranchProtectionRule(new CreateBranchProtectionRuleInput
+                    // {
+                    //     Pattern = repository.DefaultBranch,
+                    //     RepositoryId = new ID(repository.NodeId),
+                    //     AllowsDeletions = false,
+                    //     AllowsForcePushes = false,
+                    //     RequiresCodeOwnerReviews = true,
+                    //     RequiresApprovingReviews = true,
+                    //     RequiresLinearHistory = true,
+                    //     RequiresStatusChecks = true,
+                    //     RequiredApprovingReviewCount = 1,
+                    //     RequiresStrictStatusChecks = true,
+                    //     RequiresConversationResolution = true,
+                    //     DismissesStaleReviews = true
+                    // });
+                }
+            }
+        }
+
+        return new BranchProtectionAnalyzerResult(branchProtectionRules);
     }
 }

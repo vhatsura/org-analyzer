@@ -1,65 +1,68 @@
-﻿using System.Text;
-using System.Text.Json;
-using Octokit;
+﻿using Octokit;
 
 namespace OrgAnalyzer;
 
-public static class ActionSecretUsageAnalyzer
+public record FileReference(string RepositoryUrl, List<string> Files);
+
+public record SecretUsage(string SecretName, FileReference[] References);
+
+public record ActionSecretUsageResult(SecretUsage[] Usage);
+
+public class ActionSecretUsageAnalyzer
 {
-    internal static async Task AnalyzeActionSecretUsage(string secretName)
+    private readonly GitHubService _gitHubService;
+
+    public ActionSecretUsageAnalyzer(GitHubService gitHubService)
     {
-        var client = GitHubApiClient.CreateRestClient();
+        _gitHubService = gitHubService;
+    }
 
-        var repositories =
-            await client.Repository.GetAllForOrg(Program.Organization, new ApiOptions { PageSize = 100 });
+    internal async Task<ActionSecretUsageResult> RunAnalysis(string[] secretNames)
+    {
+        var result = secretNames.ToDictionary(secretName => secretName,
+            secretName => new Dictionary<long, HashSet<RepositoryContent>>());
 
-        if (repositories.Count == 100) throw new InvalidOperationException();
-
-        var result = new Dictionary<long, HashSet<RepositoryContent>>();
         var repositoriesDictionary = new Dictionary<long, Repository>();
 
-        var repoIdsWithCreatedPRs = new HashSet<long>();
-
-        foreach (var repository in repositories)
+        await foreach (var repositories in _gitHubService.OrganizationRepositories())
         {
-            repositoriesDictionary.Add(repository.Id, repository);
-
-            try
+            foreach (var repository in repositories)
             {
-                var contents = await client.Repository.Content.GetAllContents(repository.Id, ".github/workflows");
-                foreach (var content in contents)
+                repositoriesDictionary.Add(repository.Id, repository);
+
+                try
                 {
-                    if (content.Type.Value == ContentType.File)
+                    var contents = await _gitHubService.GetAllContents(repository.Id, ".github/workflows");
+                    foreach (var content in contents)
                     {
-                        var rawContentByteArray =
-                            await client.Repository.Content.GetRawContent(Program.Organization, repository.Name, content.Path);
-
-                        var rawContent = Encoding.UTF8.GetString(rawContentByteArray);
-
-                        if (rawContent.Contains($"secrets.{secretName}"))
+                        if (content.Type.Value == ContentType.File)
                         {
-                            if (!result.ContainsKey(repository.Id))
-                            {
-                                result.Add(repository.Id, new HashSet<RepositoryContent>());
-                            }
+                            var rawContent = await _gitHubService.GetRawContent(repository.Name, content.Path);
 
-                            result[repository.Id].Add(content);
+                            foreach (var secretName in secretNames)
+                            {
+                                if (rawContent.Contains($"secrets.{secretName}"))
+                                {
+                                    if (!result[secretName].ContainsKey(repository.Id))
+                                    {
+                                        result[secretName].Add(repository.Id, new HashSet<RepositoryContent>());
+                                    }
+
+                                    result[secretName][repository.Id].Add(content);
+                                }
+                            }
                         }
                     }
                 }
-            }
-            catch (NotFoundException ex)
-            {
-                // ignore
+                catch (NotFoundException ex)
+                {
+                    // ignore
+                }
             }
         }
 
-        var filesContainsSecret = result.Select(x => new
-        {
-            RepositoryUrl = repositoriesDictionary[x.Key].Url,
-            Files = x.Value.Select(c => c.Path).ToList()
-        }).ToList();
-
-        var stringData = JsonSerializer.Serialize(filesContainsSecret, new JsonSerializerOptions { WriteIndented = true });
+        return new ActionSecretUsageResult(result.Select(x => new SecretUsage(x.Key, x.Value.Select(u =>
+                new FileReference(repositoriesDictionary[u.Key].Url, u.Value.Select(c => c.Path).ToList())).ToArray())
+        ).ToArray());
     }
 }
