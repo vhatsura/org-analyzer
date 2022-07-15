@@ -8,6 +8,7 @@ using OrgAnalyzer.Options;
 using Connection = Octokit.GraphQL.Connection;
 using PullRequest = Octokit.PullRequest;
 using Repository = Octokit.Repository;
+using Team = Octokit.Team;
 
 namespace OrgAnalyzer;
 
@@ -91,8 +92,7 @@ public class GitHubService
             .RepositoryTopics(50)
             .Select(repoTopics => new
             {
-                repoTopics.PageInfo.HasNextPage,
-                Topics = repoTopics.Edges.Select(e => e.Node.Topic.Name).ToList()
+                repoTopics.PageInfo.HasNextPage, Topics = repoTopics.Edges.Select(e => e.Node.Topic.Name).ToList()
             })
             .Compile();
 
@@ -101,5 +101,15 @@ public class GitHubService
         if (result.HasNextPage) throw new InvalidOperationException();
 
         return result.Topics;
+    }
+
+    public async Task<IReadOnlyList<Team>> OrganizationTeams()
+    {
+        return await _client.Organization.Team.GetAll(_options.Organization);
+    }
+
+    public async Task<IReadOnlyList<Team>> RepositoryTeams(long repositoryId)
+    {
+        return await _client.Repository.GetAllTeams(repositoryId);
     }
 }
