@@ -30,16 +30,19 @@ public class RepositoryOwnershipTopicAnalyzer : IRepositoryAnalyzer
         }
     }
 
-    public ValueTask<IRepositoryIssue?> RunAnalysis(RepositoryMetadata repositoryMetadata)
+    public ValueTask<IReadOnlyList<IRepositoryIssue>> RunAnalysis(RepositoryMetadata repositoryMetadata)
     {
         if (repositoryMetadata.Ownership == null)
         {
-            return new ValueTask<IRepositoryIssue?>(new MissedOwnershipTopic());
+            return new ValueTask<IReadOnlyList<IRepositoryIssue>>(new IRepositoryIssue[]
+            {
+                new MissedOwnershipTopic()
+            });
         }
 
-        return new ValueTask<IRepositoryIssue?>(
+        return new ValueTask<IReadOnlyList<IRepositoryIssue>>(
             !_knownTeams.Contains(repositoryMetadata.Ownership)
-                ? new UnknownOwnershipTopic(repositoryMetadata.Ownership)
-                : null);
+                ? new IRepositoryIssue[] { new UnknownOwnershipTopic(repositoryMetadata.Ownership) }
+                : Array.Empty<IRepositoryIssue>());
     }
 }

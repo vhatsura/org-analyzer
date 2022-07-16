@@ -112,4 +112,20 @@ public class GitHubService
     {
         return await _client.Repository.GetAllTeams(repositoryId);
     }
+
+    public async Task AddTeamToRepository(int teamId, string repositoryName, Permission permission)
+    {
+        await _client.Organization.Team.AddRepository(teamId, _options.Organization, repositoryName,
+            new RepositoryPermissionRequest(permission));
+    }
+
+    public async Task GetTeamMembers(int teamId)
+    {
+        var members = await _client.Organization.Team.GetAllMembers(teamId);
+
+        foreach (var member in members)
+        {
+            var membershipDetails = await _client.Organization.Team.GetMembershipDetails(teamId, member.Login);
+        }
+    }
 }
