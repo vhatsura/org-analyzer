@@ -20,6 +20,8 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton(new Octokit.GraphQL.Connection(new Octokit.GraphQL.ProductHeaderValue("MyApp"),
             ctx.Configuration.GetValue<string>("GitHub:Token")));
 
+        services.AddSingleton<IOrganizationAnalyzer, TeamMaintainerAnalyzer>();
+
         services.AddSingleton<IRepositoryAnalyzer, RepositoryOwnershipTopicAnalyzer>();
         services.AddSingleton<IRepositoryAnalyzer, RepositoryAccessAnalyzer>();
 

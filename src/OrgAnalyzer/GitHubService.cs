@@ -9,6 +9,7 @@ using Connection = Octokit.GraphQL.Connection;
 using PullRequest = Octokit.PullRequest;
 using Repository = Octokit.Repository;
 using Team = Octokit.Team;
+using User = Octokit.User;
 
 namespace OrgAnalyzer;
 
@@ -17,6 +18,8 @@ public class GitHubService
     private readonly GitHubClient _client;
     private readonly Connection _gqlConnection;
     private readonly GitHubOptions _options;
+
+    public string Organization => _options.Organization;
 
     public GitHubService(GitHubClient client, Connection gqlConnection, IOptions<GitHubOptions> options)
     {
@@ -113,19 +116,54 @@ public class GitHubService
         return await _client.Repository.GetAllTeams(repositoryId);
     }
 
+    public async Task<IReadOnlyList<User>> RepositoryCollaborators(long repositoryId)
+    {
+        return await _client.Repository.Collaborator.GetAll(repositoryId);
+    }
+
     public async Task AddTeamToRepository(int teamId, string repositoryName, Permission permission)
     {
         await _client.Organization.Team.AddRepository(teamId, _options.Organization, repositoryName,
             new RepositoryPermissionRequest(permission));
     }
 
-    public async Task GetTeamMembers(int teamId)
+    public async Task<IReadOnlyList<(User User, TeamMembershipDetails Membership)>> TeamMembers(int teamId)
     {
         var members = await _client.Organization.Team.GetAllMembers(teamId);
+
+        var result = new List<(User User, TeamMembershipDetails Membership)>(members.Count);
 
         foreach (var member in members)
         {
             var membershipDetails = await _client.Organization.Team.GetMembershipDetails(teamId, member.Login);
+
+            result.Add((member, membershipDetails));
         }
+
+        return result;
     }
+
+    public async Task<IReadOnlyList<User>> OrganizationOwners()
+    {
+        var result = new List<User>();
+        var orgMembers = await _client.Organization.Member.GetAll(_options.Organization);
+
+        foreach (var orgMember in orgMembers)
+        {
+            var orgMembership =
+                await _client.Organization.Member.GetOrganizationMembership(_options.Organization, orgMember.Login);
+
+            if (orgMembership.Role.Value == MembershipRole.Admin)
+            {
+                result.Add(orgMember);
+            }
+        }
+
+        return result;
+    }
+
+    // public async Task<IReadOnlyList<User>> OrganizationMembers()
+    // {
+    //
+    // }
 }

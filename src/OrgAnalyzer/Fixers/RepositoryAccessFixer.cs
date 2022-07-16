@@ -13,6 +13,7 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
         get
         {
             yield return typeof(MissedTeamAccess);
+            yield return typeof(MissedAdminAccess);
         }
     }
 
@@ -38,9 +39,14 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
             if (_knownTeams.TryGetValue(missedTeamAccess.Ownership, out var team))
             {
                 await _gitHubService.AddTeamToRepository(team.Id, repositoryMetadata.Repository.Name,
-                    Permission.Maintain);
+                    missedTeamAccess.Permission);
                 return true;
             }
+        }
+
+        else if (issue is MissedAdminAccess missedAdminAccess)
+        {
+
         }
 
         return false;
