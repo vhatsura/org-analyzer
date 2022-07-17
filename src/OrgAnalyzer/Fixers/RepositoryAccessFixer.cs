@@ -14,6 +14,7 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
         {
             yield return typeof(MissedTeamAccess);
             yield return typeof(MissedAdminAccess);
+            yield return typeof(InvalidTeamAccess);
         }
     }
 
@@ -36,9 +37,9 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
     {
         if (issue is MissedTeamAccess missedTeamAccess)
         {
-            if (_knownTeams.TryGetValue(missedTeamAccess.Ownership, out var team))
+            if (_knownTeams.TryGetValue(missedTeamAccess.Ownership.ToLowerInvariant(), out var team))
             {
-                await _gitHubService.AddTeamToRepository(team.Id, repositoryMetadata.Repository.Name,
+                await _gitHubService.AddOrUpdateTeamForRepository(team.Id, repositoryMetadata.Repository.Name,
                     missedTeamAccess.Permission);
                 return true;
             }
@@ -46,7 +47,16 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
 
         else if (issue is MissedAdminAccess missedAdminAccess)
         {
+        }
 
+        else if (issue is InvalidTeamAccess invalidTeamAccess)
+        {
+            if (_knownTeams.TryGetValue(invalidTeamAccess.Team.ToLowerInvariant(), out var team))
+            {
+                await _gitHubService.AddOrUpdateTeamForRepository(team.Id, repositoryMetadata.Repository.Name,
+                    invalidTeamAccess.ExpectedPermission);
+                return true;
+            }
         }
 
         return false;

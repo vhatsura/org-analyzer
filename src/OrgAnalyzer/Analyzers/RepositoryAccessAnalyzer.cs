@@ -1,4 +1,5 @@
 using Octokit;
+using OrgAnalyzer.Extensions;
 
 namespace OrgAnalyzer.Analyzers;
 
@@ -24,12 +25,19 @@ public record ExtensiveCollaboratorAccess(string Login, string Permission) : IRe
         $"Extensive '{Login}' collaborator access: '{Permission}'.";
 }
 
+public record InvalidTeamAccess
+    (string Team, Permission ActualPermission, Permission ExpectedPermission) : IRepositoryIssue
+{
+    public string Title => $"Invalid '{Team}' team access: '{ActualPermission}' instead of '{ExpectedPermission}'.";
+}
+
 public class RepositoryAccessAnalyzer : IRepositoryAnalyzer
 {
     private readonly GitHubService _gitHubService;
-    private IDictionary<string, string> _parentTeams = new Dictionary<string, string>();
+    private Dictionary<string, string> _parentTeams = new();
     private readonly HashSet<string> _ownerLogins = new();
-    private readonly IDictionary<int, HashSet<string>> _teamMaintainers = new Dictionary<int, HashSet<string>>();
+    private readonly Dictionary<int, HashSet<string>> _teamMaintainers = new();
+    private readonly Dictionary<(long RepositoryId, int TeamId), RepositoryPermissions> _teamPermissions = new();
 
     public RepositoryAccessAnalyzer(GitHubService gitHubService)
     {
@@ -56,6 +64,13 @@ public class RepositoryAccessAnalyzer : IRepositoryAnalyzer
             _teamMaintainers.Add(team.Id, members.Where(x =>
                 x.Membership.Role.Value == TeamRole.Maintainer &&
                 x.Membership.State.Value == MembershipState.Active).Select(x => x.User.Login).ToHashSet());
+
+            var teamRepositories = await _gitHubService.TeamRepositories(team.Id);
+
+            foreach (var teamRepository in teamRepositories)
+            {
+                _teamPermissions.Add((teamRepository.Id, team.Id), teamRepository.Permissions);
+            }
         }
     }
 
@@ -114,19 +129,36 @@ public class RepositoryAccessAnalyzer : IRepositoryAnalyzer
 
         foreach (var team in teams)
         {
+            if (!_teamPermissions.TryGetValue((metadata.Repository.Id, team.Id), out var permissions))
+            {
+                throw new InvalidOperationException();
+            }
+
+            var teamPermission = permissions.ToPermission();
+
             if (metadata.Ownership != null && team.Name.ToLowerInvariant() == metadata.Ownership)
             {
+                if (teamPermission != Permission.Maintain)
+                {
+                    yield return new InvalidTeamAccess(team.Name, teamPermission, Permission.Maintain);
+                }
+
                 ownershipTeam = team;
             }
             else if (parentTeamName != null && team.Name.ToLowerInvariant() == parentTeamName)
             {
+                if (teamPermission != Permission.Push)
+                {
+                    yield return new InvalidTeamAccess(team.Name, teamPermission, Permission.Push);
+                }
+
                 parentOwnershipTeam = team;
             }
             else
             {
-                if (team.Permission.StringValue == "admin")
+                if (teamPermission != Permission.Pull)
                 {
-                    yield return new ExtensiveTeamAccess(team.Name, team.Permission.StringValue);
+                    yield return new InvalidTeamAccess(team.Name, teamPermission, Permission.Pull);
                 }
             }
         }

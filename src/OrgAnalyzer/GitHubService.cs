@@ -121,7 +121,12 @@ public class GitHubService
         return await _client.Repository.Collaborator.GetAll(repositoryId);
     }
 
-    public async Task AddTeamToRepository(int teamId, string repositoryName, Permission permission)
+    public async Task<IReadOnlyList<Repository>> TeamRepositories(int teamId)
+    {
+        return await _client.Organization.Team.GetAllRepositories(teamId);
+    }
+
+    public async Task AddOrUpdateTeamForRepository(int teamId, string repositoryName, Permission permission)
     {
         await _client.Organization.Team.AddRepository(teamId, _options.Organization, repositoryName,
             new RepositoryPermissionRequest(permission));
@@ -161,9 +166,4 @@ public class GitHubService
 
         return result;
     }
-
-    // public async Task<IReadOnlyList<User>> OrganizationMembers()
-    // {
-    //
-    // }
 }
