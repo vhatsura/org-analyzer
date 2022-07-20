@@ -12,7 +12,8 @@
       <PackageReference Include="Microsoft.Extensions.Hosting" Version="6.0.1" />
       <PackageReference Include="Microsoft.Extensions.Options" Version="6.0.0" />
       <PackageReference Include="Octokit" Version="1.0.0" />
-      <PackageReference Include="Octokit.GraphQL" Version="0.1.8-beta" />
+      <PackageReference Include="Octokit.GraphQL" Version="0.1.9-beta" />
+      <PackageReference Include="Scrutor" Version="4.2.0" />
       <PackageReference Include="System.Text.Json" Version="6.0.5" />
     </ItemGroup>
 

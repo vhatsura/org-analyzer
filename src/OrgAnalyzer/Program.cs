@@ -20,12 +20,17 @@ var host = Host.CreateDefaultBuilder(args)
         services.AddSingleton(new Octokit.GraphQL.Connection(new Octokit.GraphQL.ProductHeaderValue("MyApp"),
             ctx.Configuration.GetValue<string>("GitHub:Token")));
 
-        services.AddSingleton<IOrganizationAnalyzer, TeamMaintainerAnalyzer>();
-
-        services.AddSingleton<IRepositoryAnalyzer, RepositoryOwnershipTopicAnalyzer>();
-        services.AddSingleton<IRepositoryAnalyzer, RepositoryAccessAnalyzer>();
-
-        services.AddSingleton<IRepositoryIssueFixer, RepositoryAccessFixer>();
+        services.Scan(scan =>
+            scan.FromAssemblyOf<AnalysisRunner>()
+                .AddClasses(classes => classes.AssignableTo<IRepositoryIssueFixer>())
+                .AsImplementedInterfaces()
+                .WithSingletonLifetime()
+                .AddClasses(classes => classes.AssignableTo<IRepositoryAnalyzer>())
+                .AsImplementedInterfaces()
+                .WithSingletonLifetime()
+                .AddClasses(classes => classes.AssignableTo<IOrganizationAnalyzer>())
+                .AsImplementedInterfaces()
+                .WithSingletonLifetime());
 
         services.AddSingleton<GitHubService>();
         services.AddSingleton<AnalysisRunner>();
