@@ -88,6 +88,30 @@ public class GitHubService
         var result = await _gqlConnection.Run(mutation);
     }
 
+    public async Task<RepositorySettings> RepositorySettings(string owner, string repository)
+    {
+        var query = new Query()
+            .Repository(repository, owner)
+            .Select(payload =>
+                new
+                {
+                    payload.MergeCommitAllowed,
+                    payload.SquashMergeAllowed,
+                    payload.RebaseMergeAllowed,
+                    payload.AutoMergeAllowed,
+                    payload.DeleteBranchOnMerge,
+                    payload.HasWikiEnabled,
+                    // payload.Di
+                    // todo: wait for AllowUpdateBranch in the next release
+                    // todo: wait for SquashPrTitleUsedAsDefault in the next release
+                });
+
+        var result = await _gqlConnection.Run(query);
+
+        return new RepositorySettings(result.MergeCommitAllowed, result.RebaseMergeAllowed, result.SquashMergeAllowed,
+            result.AutoMergeAllowed, result.DeleteBranchOnMerge, result.HasWikiEnabled);
+    }
+
     public async Task<List<string>> RepositoryTopics(Repository repository)
     {
         var query = new Query()
@@ -165,5 +189,26 @@ public class GitHubService
         }
 
         return result;
+    }
+
+    public async Task DisableMergeCommits(long repositoryId, string repositoryName)
+    {
+        await _client.Repository.Edit(repositoryId, new RepositoryUpdate(repositoryName) { AllowMergeCommit = false });
+    }
+
+    public async Task AllowAutoMerge(long repositoryId, string repositoryName)
+    {
+        await _client.Repository.Edit(repositoryId, new RepositoryUpdate(repositoryName) { AllowAutoMerge = true });
+    }
+
+    public async Task EnableDeleteBranchOnMerge(long repositoryId, string repositoryName)
+    {
+        await _client.Repository.Edit(repositoryId,
+            new RepositoryUpdate(repositoryName) { DeleteBranchOnMerge = true });
+    }
+
+    public async Task DisableWiki(long repositoryId, string repositoryName)
+    {
+        await _client.Repository.Edit(repositoryId, new RepositoryUpdate(repositoryName) { HasWiki = false });
     }
 }
