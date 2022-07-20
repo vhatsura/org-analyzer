@@ -87,7 +87,7 @@ public class AnalysisRunner
 
         await foreach (var repositories in _gitHubService.OrganizationRepositories())
         {
-            foreach (var repository in repositories)
+            foreach (var repository in repositories.Where(x => !x.Archived))
             {
                 var repositoryTopics = await _gitHubService.RepositoryTopics(repository);
 
