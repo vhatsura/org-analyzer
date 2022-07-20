@@ -54,7 +54,7 @@ public class ActionSecretUsageAnalyzer
                         }
                     }
                 }
-                catch (NotFoundException ex)
+                catch (NotFoundException)
                 {
                     // ignore
                 }

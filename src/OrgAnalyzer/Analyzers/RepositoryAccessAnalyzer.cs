@@ -79,7 +79,7 @@ public class RepositoryAccessAnalyzer : IRepositoryAnalyzer
         var issues = new List<IRepositoryIssue>();
         var teams = await _gitHubService.RepositoryTeams(metadata.Repository.Id);
 
-        await foreach (var issue in TeamAccessIssues(metadata, teams))
+        foreach (var issue in TeamAccessIssues(metadata, teams))
         {
             issues.Add(issue);
         }
@@ -114,7 +114,7 @@ public class RepositoryAccessAnalyzer : IRepositoryAnalyzer
         return issues;
     }
 
-    private async IAsyncEnumerable<IRepositoryIssue> TeamAccessIssues(RepositoryMetadata metadata,
+    private IEnumerable<IRepositoryIssue> TeamAccessIssues(RepositoryMetadata metadata,
         IReadOnlyList<Team> teams)
     {
         // todo: refactor this
