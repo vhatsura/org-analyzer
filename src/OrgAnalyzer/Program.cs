@@ -7,7 +7,6 @@ using Octokit;
 using Octokit.Internal;
 using OrgAnalyzer;
 using OrgAnalyzer.Analyzers;
-using OrgAnalyzer.Fixers;
 using OrgAnalyzer.Options;
 
 var host = Host.CreateDefaultBuilder(args)

@@ -136,7 +136,12 @@ public class AnalysisRunner
                     multipleTypes = true;
                 }
 
-                type = Enum.Parse<RepositoryType>(repositoryTopic[5..]);
+                type = repositoryTopic[5..] switch
+                {
+                    "service" => RepositoryType.Service,
+                    "library" => RepositoryType.Library,
+                    _ => RepositoryType.Unknown,
+                };
             }
         }
 
@@ -169,8 +174,10 @@ public class AnalysisRunner
         List<(RepositoryMetadata RepositoryMetadata, List<(IRepositoryIssue Issue, bool Fixed)> Issues)> issues)
     {
         var totalIssuesCount = issues.Sum(x => x.Issues.Count);
+        var fixedIssuesCount = issues.Sum(x => x.Issues.Count(x => x.Fixed));
 
         Console.WriteLine($"{totalIssuesCount} issues were found across all repositories");
+        Console.WriteLine($"{fixedIssuesCount} issues were fixed");
 
         foreach (var (metadata, repoIssues) in issues)
         {

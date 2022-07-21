@@ -13,6 +13,13 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
         get
         {
             yield return typeof(MissedBranchProtection);
+            yield return typeof(ApprovingReviewsNonRequired);
+            yield return typeof(CodeOwnerReviewsNonRequired);
+            yield return typeof(AdminsAreNotEnforced);
+            yield return typeof(StatusChecksNonRequired);
+            yield return typeof(StrictStatusChecksNonRequired);
+            yield return typeof(InvalidApprovingReviewCount);
+            yield return typeof(StaleReviewsAreNotDismissed);
         }
     }
 
@@ -70,6 +77,61 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
             {
                 BranchProtectionRuleId = codeOwnerReviewsNonRequired.BranchProtectionRuleId,
                 RequiresCodeOwnerReviews = true,
+            });
+
+            return true;
+        }
+
+        if (issue is AdminsAreNotEnforced adminsAreNotEnforced)
+        {
+            await _gitHubService.UpdateBranchProtectionRule(new UpdateBranchProtectionRuleInput
+            {
+                BranchProtectionRuleId = adminsAreNotEnforced.BranchProtectionRuleId, IsAdminEnforced = true
+            });
+
+            return true;
+        }
+
+        if (issue is StatusChecksNonRequired statusChecksNonRequired)
+        {
+            await _gitHubService.UpdateBranchProtectionRule(new UpdateBranchProtectionRuleInput
+            {
+                BranchProtectionRuleId = statusChecksNonRequired.BranchProtectionRuleId,
+                RequiresStatusChecks = true,
+                RequiresStrictStatusChecks = true,
+            });
+
+            return true;
+        }
+
+        if (issue is StrictStatusChecksNonRequired strictStatusChecksNonRequired)
+        {
+            await _gitHubService.UpdateBranchProtectionRule(new UpdateBranchProtectionRuleInput
+            {
+                BranchProtectionRuleId = strictStatusChecksNonRequired.BranchProtectionRuleId,
+                RequiresStrictStatusChecks = true,
+            });
+
+            return true;
+        }
+
+        if (issue is InvalidApprovingReviewCount invalidApprovingReviewCount)
+        {
+            await _gitHubService.UpdateBranchProtectionRule(new UpdateBranchProtectionRuleInput
+            {
+                BranchProtectionRuleId = invalidApprovingReviewCount.BranchProtectionRuleId,
+                RequiredApprovingReviewCount = invalidApprovingReviewCount.ExpectedCount,
+            });
+
+            return true;
+        }
+
+        if (issue is StaleReviewsAreNotDismissed staleReviewsAreNotDismissed)
+        {
+            await _gitHubService.UpdateBranchProtectionRule(new UpdateBranchProtectionRuleInput
+            {
+                BranchProtectionRuleId = staleReviewsAreNotDismissed.BranchProtectionRuleId,
+                DismissesStaleReviews = true,
             });
 
             return true;
