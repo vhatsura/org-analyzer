@@ -1,3 +1,4 @@
+using Octokit;
 using OrgAnalyzer.Analyzers;
 
 namespace OrgAnalyzer;
@@ -89,12 +90,7 @@ public class AnalysisRunner
         {
             foreach (var repository in repositories.Where(x => !x.Archived))
             {
-                var repositoryTopics = await _gitHubService.RepositoryTopics(repository);
-
-                var ownershipTopic = repositoryTopics.FirstOrDefault(x => x.StartsWith("ownership-"));
-                var ownership = ownershipTopic?.Substring(10);
-
-                var repositoryMetadata = new RepositoryMetadata(repository, ownership);
+                var repositoryMetadata = await RepositoryMetadata(repository);
 
                 var repositoryIssues = new List<IRepositoryIssue>();
                 issues.Add((repositoryMetadata, repositoryIssues));
@@ -111,6 +107,50 @@ public class AnalysisRunner
         }
 
         return issues;
+    }
+
+    private async Task<RepositoryMetadata> RepositoryMetadata(Repository repository)
+    {
+        string? ownership = null;
+        bool multipleOwnerships = false;
+        RepositoryType type = RepositoryType.Unknown;
+        bool multipleTypes = false;
+
+        var repositoryTopics = await _gitHubService.RepositoryTopics(repository);
+
+        foreach (var repositoryTopic in repositoryTopics)
+        {
+            if (repositoryTopic.StartsWith("ownership-"))
+            {
+                if (ownership != null)
+                {
+                    multipleOwnerships = true;
+                }
+
+                ownership = repositoryTopic[10..];
+            }
+            else if (repositoryTopic.StartsWith("type-"))
+            {
+                if (type != RepositoryType.Unknown)
+                {
+                    multipleTypes = true;
+                }
+
+                type = Enum.Parse<RepositoryType>(repositoryTopic[5..]);
+            }
+        }
+
+        if (multipleOwnerships)
+        {
+            ownership = null;
+        }
+
+        if (multipleTypes)
+        {
+            type = RepositoryType.Unknown;
+        }
+
+        return new RepositoryMetadata(repository, ownership, type);
     }
 
     private void PrintOrganizationIssues(IReadOnlyList<IOrganizationIssue> issues)

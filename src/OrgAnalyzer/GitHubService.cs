@@ -74,15 +74,48 @@ public class GitHubService
         } while (!isLastPage);
     }
 
-    public async Task<BranchProtectionSettings> BranchProtection(long repositoryId, string branchName)
+    public async Task<(BranchProtectionSettings Settings, ID Id)?> BranchProtection(string owner, string name,
+        string branchName)
     {
-        return await _client.Repository.Branch.GetBranchProtection(repositoryId, branchName);
+        try
+        {
+            var settings = await _client.Repository.Branch.GetBranchProtection(owner, name, branchName);
+
+            var query = new Query()
+                .Repository(name, owner)
+                .Select(payload => new
+                {
+                    Rules = payload.BranchProtectionRules(null, null, null, null).AllPages()
+                        .Select(rule => new { rule.Id, rule.Pattern }).ToList()
+                });
+
+            var result = await _gqlConnection.Run(query);
+
+            var rule = result.Rules.SingleOrDefault(x => x.Pattern == branchName);
+
+            if (rule == null) return null;
+
+            return (settings, rule.Id);
+        }
+        catch (NotFoundException)
+        {
+            return null;
+        }
     }
 
     public async Task CreateBranchProtectionRule(CreateBranchProtectionRuleInput input)
     {
         var mutation = new Mutation()
             .CreateBranchProtectionRule(new Arg<CreateBranchProtectionRuleInput>(input))
+            .Select(payload => new { payload.ClientMutationId });
+
+        var result = await _gqlConnection.Run(mutation);
+    }
+
+    public async Task UpdateBranchProtectionRule(UpdateBranchProtectionRuleInput input)
+    {
+        var mutation = new Mutation()
+            .UpdateBranchProtectionRule(input)
             .Select(payload => new { payload.ClientMutationId });
 
         var result = await _gqlConnection.Run(mutation);

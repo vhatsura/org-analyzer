@@ -10,12 +10,17 @@ public record UnknownOwnershipTopic(string Topic) : IRepositoryIssue
     public string Title => $"Unknown ownership topic: {Topic}";
 }
 
-public class RepositoryOwnershipTopicAnalyzer : IRepositoryAnalyzer
+public record MissedOrInvalidRepositoryType : IRepositoryIssue
+{
+    public string Title => "Repository type missed or invalid";
+}
+
+public class RepositoryTopicsAnalyzer : IRepositoryAnalyzer
 {
     private readonly GitHubService _gitHubService;
     private readonly HashSet<string> _knownTeams = new();
 
-    public RepositoryOwnershipTopicAnalyzer(GitHubService gitHubService)
+    public RepositoryTopicsAnalyzer(GitHubService gitHubService)
     {
         _gitHubService = gitHubService;
     }
@@ -32,17 +37,22 @@ public class RepositoryOwnershipTopicAnalyzer : IRepositoryAnalyzer
 
     public ValueTask<IReadOnlyList<IRepositoryIssue>> RunAnalysis(RepositoryMetadata repositoryMetadata)
     {
+        var issues = new List<IRepositoryIssue>();
+
         if (repositoryMetadata.Ownership == null)
         {
-            return new ValueTask<IReadOnlyList<IRepositoryIssue>>(new IRepositoryIssue[]
-            {
-                new MissedOwnershipTopic()
-            });
+            issues.Add(new MissedOwnershipTopic());
+        }
+        else if (!_knownTeams.Contains(repositoryMetadata.Ownership))
+        {
+            issues.Add(new UnknownOwnershipTopic(repositoryMetadata.Ownership));
         }
 
-        return new ValueTask<IReadOnlyList<IRepositoryIssue>>(
-            !_knownTeams.Contains(repositoryMetadata.Ownership)
-                ? new IRepositoryIssue[] { new UnknownOwnershipTopic(repositoryMetadata.Ownership) }
-                : Array.Empty<IRepositoryIssue>());
+        if (repositoryMetadata.Type == RepositoryType.Unknown)
+        {
+
+        }
+
+        return new ValueTask<IReadOnlyList<IRepositoryIssue>>(issues);
     }
 }
