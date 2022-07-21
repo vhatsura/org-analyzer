@@ -50,7 +50,7 @@ public class RepositoryTopicsAnalyzer : IRepositoryAnalyzer
 
         if (repositoryMetadata.Type == RepositoryType.Unknown)
         {
-
+            issues.Add(new MissedOrInvalidRepositoryType());
         }
 
         return new ValueTask<IReadOnlyList<IRepositoryIssue>>(issues);
