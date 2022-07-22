@@ -1,6 +1,7 @@
 using Octokit.GraphQL;
 using Octokit.GraphQL.Model;
 using OrgAnalyzer.Analyzers;
+using OrgAnalyzer.Models;
 
 namespace OrgAnalyzer.Fixers;
 
@@ -33,7 +34,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
         return ValueTask.CompletedTask;
     }
 
-    public async Task<bool> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata)
+    public async Task<FixIssueResult> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata)
     {
         if (issue is MissedBranchProtection)
         {
@@ -54,7 +55,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 AllowsDeletions = false,
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is ApprovingReviewsNonRequired approvingReviewsNonRequired)
@@ -68,7 +69,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 RequiredApprovingReviewCount = 1
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is CodeOwnerReviewsNonRequired codeOwnerReviewsNonRequired)
@@ -79,7 +80,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 RequiresCodeOwnerReviews = true,
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is AdminsAreNotEnforced adminsAreNotEnforced)
@@ -89,7 +90,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 BranchProtectionRuleId = adminsAreNotEnforced.BranchProtectionRuleId, IsAdminEnforced = true
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is StatusChecksNonRequired statusChecksNonRequired)
@@ -101,7 +102,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 RequiresStrictStatusChecks = true,
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is StrictStatusChecksNonRequired strictStatusChecksNonRequired)
@@ -112,7 +113,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 RequiresStrictStatusChecks = true,
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is InvalidApprovingReviewCount invalidApprovingReviewCount)
@@ -123,7 +124,7 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 RequiredApprovingReviewCount = invalidApprovingReviewCount.ExpectedCount,
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is StaleReviewsAreNotDismissed staleReviewsAreNotDismissed)
@@ -134,9 +135,9 @@ public class RepositoryBranchProtectionFixer : IRepositoryIssueFixer
                 DismissesStaleReviews = true,
             });
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
-        return false;
+        return new FixIssueResult(FixStatus.NotFixed, null);
     }
 }

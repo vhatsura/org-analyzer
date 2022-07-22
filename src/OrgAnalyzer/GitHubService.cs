@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.Options;
 using Octokit;
 using Octokit.GraphQL;
@@ -17,6 +18,10 @@ public class GitHubService
 {
     private readonly GitHubClient _client;
     private readonly Connection _gqlConnection;
+
+    private static readonly RateLimiter CreateContentRateLimiter = new FixedWindowRateLimiter(
+        new FixedWindowRateLimiterOptions(1, QueueProcessingOrder.OldestFirst, 10, TimeSpan.FromSeconds(1)));
+
     private readonly GitHubOptions _options;
 
     public string Organization => _options.Organization;
@@ -243,5 +248,67 @@ public class GitHubService
     public async Task DisableWiki(long repositoryId, string repositoryName)
     {
         await _client.Repository.Edit(repositoryId, new RepositoryUpdate(repositoryName) { HasWiki = false });
+    }
+
+    public async Task<PullRequest?> CodeOwnersPullRequest(long repositoryId)
+    {
+        var headBranch = "codeowners";
+
+        try
+        {
+            var branch = await _client.Repository.Branch.Get(repositoryId, headBranch);
+
+            var pullRequests = await _client.Repository.PullRequest.GetAllForRepository(repositoryId);
+
+            return pullRequests.SingleOrDefault(x => x.Head.Ref == headBranch);
+        }
+        catch (NotFoundException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<PullRequest> CreateCodeOwners(long repositoryId, string baseBranch, string content)
+    {
+        var headBranch = "codeowners";
+
+        var baseReference = await _client.Git.Reference.Get(repositoryId, $"heads/{baseBranch}");
+
+        using var lease = await CreateContentRateLimiter.WaitAsync();
+        if (lease.IsAcquired)
+        {
+            await _client.Git.Reference.Create(repositoryId,
+                new NewReference("refs/heads/" + headBranch, baseReference.Object.Sha));
+
+            await _client.Repository.Content.CreateFile(repositoryId, ".github/CODEOWNERS",
+                new CreateFileRequest("[Automated] Add CODEOWNERS file", content) { Branch = headBranch });
+
+            return await _client.PullRequest.Create(repositoryId,
+                new NewPullRequest("Add CODEOWNERS file", headBranch, baseBranch));
+        }
+
+        throw new InvalidOperationException();
+    }
+
+    public async Task<string[]> TeamCodeOwnersPaths(string teamSlug)
+    {
+        var query = new Query()
+            .Organization(Organization)
+            .Team(teamSlug)
+            .Discussions()
+            .AllPages()
+            .Select(x => new { x.Title, x.BodyText });
+
+        var teamDiscussions = await _gqlConnection.Run(query);
+
+        foreach (var discussion in teamDiscussions)
+        {
+            if (discussion.Title == "CODEOWNERS")
+            {
+                return discussion.BodyText.Split(new[] { "\n" }, StringSplitOptions.RemoveEmptyEntries);
+            }
+        }
+
+        return Array.Empty<string>();
     }
 }

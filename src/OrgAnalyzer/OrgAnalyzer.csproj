@@ -15,6 +15,7 @@
       <PackageReference Include="Octokit.GraphQL" Version="0.1.9-beta" />
       <PackageReference Include="Scrutor" Version="4.2.0" />
       <PackageReference Include="System.Text.Json" Version="6.0.5" />
+      <PackageReference Include="System.Threading.RateLimiting" Version="7.0.0-preview.6.22324.4" />
     </ItemGroup>
 
     <ItemGroup>

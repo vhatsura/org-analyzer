@@ -1,5 +1,6 @@
 using Octokit;
 using OrgAnalyzer.Analyzers;
+using OrgAnalyzer.Models;
 
 namespace OrgAnalyzer;
 
@@ -45,21 +46,30 @@ public class AnalysisRunner
 
         var result = await AnalyzeRepositories();
         var fixes =
-            new List<(RepositoryMetadata Metadata, List<(IRepositoryIssue Issue, bool Fixed)> Issues)>(result.Count);
+            new List<(RepositoryMetadata Metadata, List<(IRepositoryIssue Issue, FixIssueResult Result)> Issues)>(
+                result.Count);
 
         foreach (var (metadata, issues) in result)
         {
-            var list = new List<(IRepositoryIssue Issue, bool Fixed)>();
+            var list = new List<(IRepositoryIssue Issue, FixIssueResult Result)>();
             foreach (var issue in issues)
             {
                 if (_fixersByType.TryGetValue(issue.GetType(), out var fixer))
                 {
-                    var fixResult = await fixer.FixIssue(issue, metadata);
-                    list.Add((issue, fixResult));
+                    try
+                    {
+                        var fixResult = await fixer.FixIssue(issue, metadata);
+                        list.Add((issue, fixResult));
+                    }
+                    catch (Exception e)
+                    {
+                        list.Add((issue,
+                            new FixIssueResult(FixStatus.NotFixed, $"Error occurred during fix: {e.Message}")));
+                    }
                 }
                 else
                 {
-                    list.Add((issue, false));
+                    list.Add((issue, new FixIssueResult(FixStatus.NotFixed, "No fixer found")));
                 }
             }
 
@@ -140,6 +150,8 @@ public class AnalysisRunner
                 {
                     "service" => RepositoryType.Service,
                     "library" => RepositoryType.Library,
+                    "frontend" => RepositoryType.Frontend,
+                    "docs" => RepositoryType.Documentation,
                     _ => RepositoryType.Unknown,
                 };
             }
@@ -171,22 +183,49 @@ public class AnalysisRunner
     }
 
     private static void PrintRepositoryIssues(
-        List<(RepositoryMetadata RepositoryMetadata, List<(IRepositoryIssue Issue, bool Fixed)> Issues)> issues)
+        List<(RepositoryMetadata RepositoryMetadata, List<(IRepositoryIssue Issue, FixIssueResult Result)> Issues)>
+            issues)
     {
-        var totalIssuesCount = issues.Sum(x => x.Issues.Count);
-        var fixedIssuesCount = issues.Sum(x => x.Issues.Count(x => x.Fixed));
+        var total = 0;
+        var @fixed = 0;
+        var inProgress = 0;
 
-        Console.WriteLine($"{totalIssuesCount} issues were found across all repositories");
-        Console.WriteLine($"{fixedIssuesCount} issues were fixed");
+        foreach (var (_, results) in issues)
+        {
+            total += results.Count;
+            foreach (var (issue, result) in results)
+            {
+                if (result.Status == FixStatus.Fixed)
+                {
+                    @fixed++;
+                }
+                else if (result.Status == FixStatus.InProgress)
+                {
+                    inProgress++;
+                }
+            }
+        }
+
+        Console.WriteLine($"{total} issues were found across all repositories");
+        Console.WriteLine($"{inProgress} issues are in progress");
+        Console.WriteLine($"{@fixed} issues were fixed");
 
         foreach (var (metadata, repoIssues) in issues)
         {
             if (repoIssues.Count > 0)
             {
-                Console.WriteLine($"{metadata.Repository.FullName} has issues:");
-                foreach (var (issue, @fixed) in repoIssues)
+                Console.WriteLine($"{metadata.Repository.HtmlUrl} has following issues:");
+                foreach (var (issue, result) in repoIssues)
                 {
-                    Console.WriteLine($"\t* {issue.Title} - {(@fixed ? "✅" : "❌")}");
+                    var statusCharacter = result.Status switch
+                    {
+                        FixStatus.Fixed => "✅",
+                        FixStatus.NotFixed => "❌",
+                        FixStatus.InProgress => "⏳",
+                        _ => throw new ArgumentOutOfRangeException()
+                    };
+
+                    Console.WriteLine($"\t* {issue.Title} - {statusCharacter} {result.Message}");
                 }
 
                 Console.WriteLine("--------------------------------------------------------------------------------");

@@ -1,4 +1,5 @@
 using OrgAnalyzer.Analyzers;
+using OrgAnalyzer.Models;
 
 namespace OrgAnalyzer.Fixers;
 
@@ -27,35 +28,38 @@ public class RepositorySettingsFixer : IRepositoryIssueFixer
         return ValueTask.CompletedTask;
     }
 
-    public async Task<bool> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata)
+    public async Task<FixIssueResult> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata)
     {
         if (issue is MergeCommitAllowed)
         {
             await _gitHubService.DisableMergeCommits(repositoryMetadata.Repository.Id,
                 repositoryMetadata.Repository.Name);
 
-            return true;
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is AutoMergeDisabled)
         {
             await _gitHubService.AllowAutoMerge(repositoryMetadata.Repository.Id, repositoryMetadata.Repository.Name);
-            return true;
+
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is DeleteBranchOnMergeDisabled)
         {
             await _gitHubService.EnableDeleteBranchOnMerge(repositoryMetadata.Repository.Id,
                 repositoryMetadata.Repository.Name);
-            return true;
+
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
         if (issue is WikiEnabled)
         {
             await _gitHubService.DisableWiki(repositoryMetadata.Repository.Id, repositoryMetadata.Repository.Name);
-            return true;
+
+            return new FixIssueResult(FixStatus.Fixed, null);
         }
 
-        return false;
+        return new FixIssueResult(FixStatus.NotFixed, null);
     }
 }

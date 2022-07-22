@@ -1,5 +1,6 @@
 using Octokit;
 using OrgAnalyzer.Analyzers;
+using OrgAnalyzer.Models;
 
 namespace OrgAnalyzer.Fixers;
 
@@ -33,7 +34,7 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
         }
     }
 
-    public async Task<bool> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata)
+    public async Task<FixIssueResult> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata)
     {
         if (issue is MissedTeamAccess missedTeamAccess)
         {
@@ -41,7 +42,8 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
             {
                 await _gitHubService.AddOrUpdateTeamForRepository(team.Id, repositoryMetadata.Repository.Name,
                     missedTeamAccess.Permission);
-                return true;
+
+                return new FixIssueResult(FixStatus.Fixed, null);
             }
         }
 
@@ -55,10 +57,11 @@ public class RepositoryAccessFixer : IRepositoryIssueFixer
             {
                 await _gitHubService.AddOrUpdateTeamForRepository(team.Id, repositoryMetadata.Repository.Name,
                     invalidTeamAccess.ExpectedPermission);
-                return true;
+
+                return new FixIssueResult(FixStatus.Fixed, null);
             }
         }
 
-        return false;
+        return new FixIssueResult(FixStatus.NotFixed, null);
     }
 }

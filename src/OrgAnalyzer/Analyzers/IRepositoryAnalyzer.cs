@@ -1,4 +1,4 @@
-using Octokit;
+using OrgAnalyzer.Models;
 
 namespace OrgAnalyzer.Analyzers;
 
@@ -20,5 +20,5 @@ public interface IRepositoryIssueFixer
 
     ValueTask Initialize();
 
-    Task<bool> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata);
+    Task<FixIssueResult> FixIssue(IRepositoryIssue issue, RepositoryMetadata repositoryMetadata);
 }

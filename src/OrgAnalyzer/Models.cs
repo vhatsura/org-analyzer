@@ -9,6 +9,8 @@ public enum RepositoryType
 {
     Service,
     Library,
+    Frontend,
+    Documentation,
 
     Unknown = 255,
 }
