@@ -1,4 +1,5 @@
 ﻿using Octokit.GraphQL;
+using OrgAnalyzer.Models;
 
 namespace OrgAnalyzer.Analyzers;
 

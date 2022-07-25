@@ -1,6 +1,7 @@
 using Octokit;
 using OrgAnalyzer.Analyzers;
 using OrgAnalyzer.Models;
+using RepositoryType = OrgAnalyzer.Models.RepositoryType;
 
 namespace OrgAnalyzer;
 

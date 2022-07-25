@@ -1,4 +1,6 @@
-﻿namespace OrgAnalyzer.Analyzers;
+﻿using OrgAnalyzer.Models;
+
+namespace OrgAnalyzer.Analyzers;
 
 public record MissedOwnershipTopic : IRepositoryIssue
 {

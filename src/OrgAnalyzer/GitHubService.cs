@@ -5,6 +5,7 @@ using Octokit;
 using Octokit.GraphQL;
 using Octokit.GraphQL.Core;
 using Octokit.GraphQL.Model;
+using OrgAnalyzer.Models;
 using OrgAnalyzer.Options;
 using Connection = Octokit.GraphQL.Connection;
 using PullRequest = Octokit.PullRequest;

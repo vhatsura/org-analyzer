@@ -1,4 +1,5 @@
 using Octokit;
+using OrgAnalyzer.Models;
 
 namespace OrgAnalyzer.Analyzers;
 

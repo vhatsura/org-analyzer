@@ -1,3 +1,5 @@
+using OrgAnalyzer.Models;
+
 namespace OrgAnalyzer.Analyzers;
 
 public record MissedReviewersOnPullRequest(string PullRequestUrl, int PullRequestNumber) : IRepositoryIssue
