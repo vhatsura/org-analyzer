@@ -89,6 +89,15 @@ public class RepositoryAccessAnalyzer : IRepositoryAnalyzer
 
         foreach (var team in teams)
         {
+            if (!_teamPermissions.TryGetValue((metadata.Repository.Id, team.Id), out var permissions))
+            {
+                throw new InvalidOperationException();
+            }
+
+            var teamPermission = permissions.ToPermission();
+
+            if (teamPermission != Permission.Maintain && teamPermission != Permission.Admin) continue;
+
             if (_teamMaintainers.TryGetValue(team.Id, out var teamMaintainers))
             {
                 teamsMaintainers.UnionWith(teamMaintainers);
