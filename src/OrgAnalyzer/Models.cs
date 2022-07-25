@@ -11,6 +11,7 @@ public enum RepositoryType
     Library,
     Frontend,
     Documentation,
+    Tool,
 
     Unknown = 255,
 }

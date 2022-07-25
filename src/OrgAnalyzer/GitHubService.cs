@@ -61,22 +61,10 @@ public class GitHubService
         } while (!isLastPage);
     }
 
-    public async IAsyncEnumerable<IReadOnlyList<PullRequest>> OpenRepositoryPullRequests(long repositoryId,
-        int pageSize = 100)
+    public async Task<IReadOnlyList<PullRequest>> OpenRepositoryPullRequests(long repositoryId)
     {
-        var startPage = 1;
-        bool isLastPage;
-
-        do
-        {
-            var pullRequests = await _client.PullRequest.GetAllForRepository(repositoryId,
-                new PullRequestRequest { State = ItemStateFilter.Open },
-                new ApiOptions { PageSize = pageSize, StartPage = startPage++ });
-
-            yield return pullRequests;
-
-            isLastPage = pullRequests.Count < pageSize;
-        } while (!isLastPage);
+        return await _client.PullRequest.GetAllForRepository(repositoryId,
+            new PullRequestRequest { State = ItemStateFilter.Open });
     }
 
     public async Task<(BranchProtectionSettings Settings, ID Id)?> BranchProtection(string owner, string name,
@@ -310,5 +298,11 @@ public class GitHubService
         }
 
         return Array.Empty<string>();
+    }
+
+    public async Task AssignTeamAsReviewer(long repositoryId, int pullRequestNumber, string teamSlug)
+    {
+        await _client.Repository.PullRequest.ReviewRequest.Create(repositoryId, pullRequestNumber,
+            new PullRequestReviewRequest(Array.Empty<string>(), new[] { teamSlug }));
     }
 }

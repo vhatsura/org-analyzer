@@ -77,6 +77,19 @@ public class AnalysisRunner
         }
 
         PrintRepositoryIssues(fixes);
+
+        var stalledPullRequestIssues = fixes.SelectMany(x =>
+                x.Issues.Where(i => i.Issue is PullRequestStalled)
+                    .Select(i => (x.Metadata, Issue: (PullRequestStalled)i.Issue)))
+            .OrderByDescending(x => x.Issue.Lifetime.TotalDays)
+            .ToList();
+
+        Console.WriteLine($"{stalledPullRequestIssues.Count} stalled pull requests:");
+        foreach (var (metadata, issue) in stalledPullRequestIssues)
+        {
+            Console.WriteLine(
+                $"{issue.PullRequestUrl} is stalled for ~{issue.Lifetime.Days} days from {issue.UserLogin}. Requested reviewers are: {string.Join(", ", issue.RequestedReviewers)}");
+        }
     }
 
     private async Task<IReadOnlyList<IOrganizationIssue>> AnalyzeOrganization()
@@ -152,7 +165,8 @@ public class AnalysisRunner
                     "library" => RepositoryType.Library,
                     "frontend" => RepositoryType.Frontend,
                     "docs" => RepositoryType.Documentation,
-                    _ => RepositoryType.Unknown,
+                    "tool" => RepositoryType.Tool,
+                    _ => RepositoryType.Unknown
                 };
             }
         }
